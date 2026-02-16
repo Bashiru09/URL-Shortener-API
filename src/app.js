@@ -4,7 +4,7 @@ const app = express();
 const route1 = require("./routes/url.route");
 app.use(express.json());
 
-app.use("/api", route1);
+app.use("/api/", route1);
 
 
 

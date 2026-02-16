@@ -1,6 +1,7 @@
 const prisma = require("../utils/client");
 const {generateShortCode} = require("../utils/generateShortCode");
 const {isValidHttpUrl} = require("../utils/validateUrl");
+const redisClient = require("../config/redis");
 
 
 
@@ -19,6 +20,7 @@ class UrlService {
         where: { shortCode: customAlias }
       });
 
+
       if (existing) {
         throw new Error('Custom alias already in use');
       }
@@ -32,7 +34,7 @@ class UrlService {
         shortCode = generateShortCode();
 
         exists = await prisma.url.findUnique({
-          where: { shortCode }
+          where: { shortCode}
         });
       }
     }
@@ -46,13 +48,19 @@ class UrlService {
     });
   }
 
-
-
-
-
   
   
   static async getOriginalUrl(shortCode) {
+
+     const cachedUrl = await redisClient.get(shortCode);
+
+     if (cachedUrl) {
+    console.log("Cache HIT");
+    return cachedUrl;
+    }
+
+    console.log("Cache MISS");
+
     const url = await prisma.url.findUnique({
       where: { shortCode }
     });
@@ -63,7 +71,12 @@ class UrlService {
       return null;
     }
 
-    
+    // Store in Redis (cache it)
+  await redisClient.set(shortCode, url.originalUrl, {
+    EX: 60 * 60 // 1 hour expiration
+  });
+
+
     await prisma.url.update({
       where: { shortCode },
       data: { clicks: { increment: 1 } }
